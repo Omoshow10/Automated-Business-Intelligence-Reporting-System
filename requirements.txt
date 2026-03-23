@@ -1,0 +1,36 @@
+# ══════════════════════════════════════════════════════════════════
+# Automated Business Intelligence Reporting System
+# Python Dependencies
+# ══════════════════════════════════════════════════════════════════
+
+# ── Core Data Processing ──────────────────────────────────────────
+pandas>=2.0.0
+numpy>=1.24.0
+scipy>=1.10.0           # Statistical functions (Z-score)
+
+# ── Database ──────────────────────────────────────────────────────
+# SQLite is built into Python — no install needed
+# Uncomment below for SQL Server support:
+# pyodbc>=4.0.39
+
+# ── Excel Report Generation ───────────────────────────────────────
+openpyxl>=3.1.0         # Excel read/write (.xlsx)
+xlsxwriter>=3.1.0       # Alternative Excel writer (charts)
+
+# ── Configuration ─────────────────────────────────────────────────
+PyYAML>=6.0
+
+# ── Testing ───────────────────────────────────────────────────────
+pytest>=7.4.0
+pytest-cov>=4.1.0       # Coverage reporting
+
+# ── Utilities ─────────────────────────────────────────────────────
+python-dateutil>=2.8.0  # Date parsing helpers
+tqdm>=4.65.0            # Progress bars for long loads
+
+# ── Optional: PDF reporting ───────────────────────────────────────
+# reportlab>=4.0.0       # Uncomment to enable PDF output
+
+# ── Optional: Scheduling ─────────────────────────────────────────
+# schedule>=1.2.0        # Uncomment for cron-style scheduling
+# APScheduler>=3.10.0    # Alternative scheduler

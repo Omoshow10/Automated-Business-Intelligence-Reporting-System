@@ -1,0 +1,54 @@
+# ══════════════════════════════════════════════════════════════════
+# config/config.yaml
+# Automated BI Reporting System — Pipeline Configuration
+# ══════════════════════════════════════════════════════════════════
+
+# ── Database ──────────────────────────────────────────────────────
+database:
+  engine: sqlite                      # sqlite | sqlserver
+  path: data/pipeline.db              # SQLite only
+
+  # SQL Server settings (uncomment if engine: sqlserver)
+  # server:   YOUR_SERVER_NAME
+  # database: BIReportingDB
+  # username: sa
+  # password: YOUR_PASSWORD
+
+# ── Pipeline Stage Toggles ────────────────────────────────────────
+pipeline:
+  ingest:    true
+  transform: true
+  anomaly:   true
+  report:    true
+
+# ── Data Paths ────────────────────────────────────────────────────
+data:
+  raw_path:       data/raw/sales_operations.csv
+  processed_path: data/processed/
+
+# ── Reporting Output ──────────────────────────────────────────────
+reporting:
+  output_format:  xlsx                # xlsx | pdf
+  output_path:    data/processed/
+  include_charts: true
+
+# ── Anomaly Detection ─────────────────────────────────────────────
+anomaly:
+  zscore_threshold: 2.5               # Flag if |z-score| > threshold
+  iqr_multiplier:   1.5               # Flag if outside Q1-k*IQR / Q3+k*IQR
+  columns:
+    - revenue
+    - cost
+
+# ── SQL File Paths ────────────────────────────────────────────────
+sql:
+  schema_file:    sql/transformations/01_create_schema.sql
+  staging_file:   sql/transformations/02_staging_layer.sql
+  core_file:      sql/transformations/03_core_layer.sql
+  reporting_file: sql/transformations/04_reporting_layer.sql
+  views_dir:      sql/views/
+
+# ── Logging ───────────────────────────────────────────────────────
+logging:
+  level:   INFO                       # DEBUG | INFO | WARNING | ERROR
+  log_dir: logs/

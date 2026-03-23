@@ -1,0 +1,70 @@
+# ── Python ────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ── Testing / Coverage ────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# ── Data Files ────────────────────────────────────────────────────
+# Raw dataset — regenerated locally via generate_dataset.py
+data/raw/sales_operations.csv
+
+# Pipeline database — generated on each run
+data/pipeline.db
+data/*.db
+
+# Generated report outputs — unique timestamps each run
+data/processed/report_summary_*.xlsx
+data/processed/anomalies.csv
+
+# Keep the processed directory in git (via .gitkeep)
+!data/processed/.gitkeep
+!data/raw/.gitkeep
+
+# ── Logs ──────────────────────────────────────────────────────────
+logs/*.log
+!logs/.gitkeep
+
+# ── Power BI ──────────────────────────────────────────────────────
+# Exclude binary .pbix — commit the README instead
+# Uncomment below to track the .pbix file:
+# !dashboards/powerbi/BI_Reporting_System.pbix
+dashboards/powerbi/*.pbix
+
+# ── Environment / Secrets ─────────────────────────────────────────
+.env
+.env.*
+config/secrets.yaml
+*.pem
+*.key
+
+# ── IDE ───────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ── Jupyter ───────────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb
+
+# ── Temporary ────────────────────────────────────────────────────
+*.tmp
+*.bak
+~$*
