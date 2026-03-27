@@ -1,54 +1,61 @@
-# ══════════════════════════════════════════════════════════════════
+# =============================================================================
 # config/config.yaml
-# Automated BI Reporting System — Pipeline Configuration
-# ══════════════════════════════════════════════════════════════════
+# Automated Business Intelligence Reporting System
+# Platform : MS SQL Server 2019+ (T-SQL)
+# Author   : Olayinka Somuyiwa
+# =============================================================================
 
-# ── Database ──────────────────────────────────────────────────────
+# ── Database — MS SQL Server ──────────────────────────────────────────────────
 database:
-  engine: sqlite                      # sqlite | sqlserver
-  path: data/pipeline.db              # SQLite only
+  server:             your_server           # SQL Server instance name or IP
+  database:           bi_reporting_db       # Target database name
+  driver:             SQL Server            # ODBC driver — or "ODBC Driver 18 for SQL Server"
+  trusted_connection: true                  # Windows Authentication
+  # username: sa                            # Uncomment for SQL Server auth
+  # password: YOUR_PASSWORD                 # Uncomment for SQL Server auth
 
-  # SQL Server settings (uncomment if engine: sqlserver)
-  # server:   YOUR_SERVER_NAME
-  # database: BIReportingDB
-  # username: sa
-  # password: YOUR_PASSWORD
-
-# ── Pipeline Stage Toggles ────────────────────────────────────────
+# ── Pipeline Stage Toggles ────────────────────────────────────────────────────
 pipeline:
   ingest:    true
   transform: true
   anomaly:   true
   report:    true
 
-# ── Data Paths ────────────────────────────────────────────────────
+# ── Data Paths ────────────────────────────────────────────────────────────────
 data:
   raw_path:       data/raw/sales_operations.csv
   processed_path: data/processed/
 
-# ── Reporting Output ──────────────────────────────────────────────
+# ── Reporting Output ──────────────────────────────────────────────────────────
 reporting:
-  output_format:  xlsx                # xlsx | pdf
+  output_format:  xlsx
   output_path:    data/processed/
   include_charts: true
 
-# ── Anomaly Detection ─────────────────────────────────────────────
+# ── Anomaly Detection ─────────────────────────────────────────────────────────
 anomaly:
-  zscore_threshold: 2.5               # Flag if |z-score| > threshold
-  iqr_multiplier:   1.5               # Flag if outside Q1-k*IQR / Q3+k*IQR
+  zscore_threshold: 2.5
+  iqr_multiplier:   1.5
   columns:
     - revenue
     - cost
 
-# ── SQL File Paths ────────────────────────────────────────────────
+# ── SQL File Paths ────────────────────────────────────────────────────────────
 sql:
   schema_file:    sql/transformations/01_create_schema.sql
   staging_file:   sql/transformations/02_staging_layer.sql
   core_file:      sql/transformations/03_core_layer.sql
   reporting_file: sql/transformations/04_reporting_layer.sql
   views_dir:      sql/views/
+  procedures_dir: sql/stored_procedures/
 
-# ── Logging ───────────────────────────────────────────────────────
+# ── Scheduling (SQL Server Agent) ─────────────────────────────────────────────
+schedule:
+  extraction_time:    "06:00"    # usp_DailyDataExtraction — SQL Server Agent
+  transformation_time: "06:30"   # pipeline_runner.py — Python scheduler
+
+# ── Logging ───────────────────────────────────────────────────────────────────
 logging:
-  level:   INFO                       # DEBUG | INFO | WARNING | ERROR
+  level:   INFO
   log_dir: logs/
+  db_log_table: dbo.pipeline_log   # Pipeline log written to SQL Server

@@ -1,45 +1,30 @@
 -- =============================================================================
 -- vw_anomaly_detection.sql
--- Statistical anomaly detection using Z-score approach in SQL
--- Power BI Page 4 — Anomaly Detection & Ops Metrics
---
--- Note: Full Z-score computation done in Python (anomaly_detector.py).
--- This view surfaces the pre-computed anomaly results from rpt_anomalies.
--- It also provides the statistical baseline for the Power BI band chart.
+-- Automated Business Intelligence Reporting System
+-- Platform : MS SQL Server 2019+ (T-SQL)
+-- Author   : Olayinka Somuyiwa
+-- Purpose  : Monthly revenue band chart data with anomaly counts.
+--            Consumed by Power BI Page 4 — Anomaly Detection & Ops Metrics.
 -- =============================================================================
 
-DROP VIEW IF EXISTS vw_anomaly_detection;
+USE [bi_reporting_db];
+GO
 
-CREATE VIEW vw_anomaly_detection AS
+CREATE OR ALTER VIEW dbo.vw_anomaly_detection AS
 WITH monthly_stats AS (
-    -- Compute per-month revenue statistics for band chart
     SELECT
         txn_month_label,
         txn_year,
         txn_month,
-        COUNT(*)                        AS txn_count,
-        ROUND(SUM(revenue), 2)          AS total_revenue,
-        ROUND(AVG(revenue), 2)          AS avg_revenue,
-        ROUND(MIN(revenue), 2)          AS min_revenue,
-        ROUND(MAX(revenue), 2)          AS max_revenue,
-        -- Approximate std dev using variance formula
-        ROUND(
-            SQRT(
-                SUM(revenue * revenue) / COUNT(*) -
-                (SUM(revenue) / COUNT(*)) * (SUM(revenue) / COUNT(*))
-            ), 2
-        )                               AS stddev_revenue
-    FROM core_sales
+        COUNT(*)                                AS txn_count,
+        CAST(SUM(revenue) AS DECIMAL(16,2))     AS total_revenue,
+        CAST(AVG(revenue) AS DECIMAL(14,2))     AS avg_revenue,
+        CAST(MIN(revenue) AS DECIMAL(14,2))     AS min_revenue,
+        CAST(MAX(revenue) AS DECIMAL(14,2))     AS max_revenue,
+        -- Standard deviation using T-SQL STDEV aggregate
+        CAST(STDEV(revenue) AS DECIMAL(14,2))   AS stddev_revenue
+    FROM dbo.core_sales
     GROUP BY txn_month_label, txn_year, txn_month
-),
-anomaly_summary AS (
-    SELECT
-        txn_date,
-        COUNT(*)                        AS anomaly_count,
-        SUM(revenue)                    AS anomalous_revenue,
-        GROUP_CONCAT(anomaly_type, ', ') AS anomaly_types
-    FROM rpt_anomalies
-    GROUP BY txn_date
 )
 SELECT
     ms.txn_month_label,
@@ -52,35 +37,36 @@ SELECT
     ms.max_revenue,
     ms.stddev_revenue,
 
-    -- Expected revenue band (±2 std dev)
-    ROUND(ms.avg_revenue - 2 * ms.stddev_revenue, 2)   AS lower_bound_2sd,
-    ROUND(ms.avg_revenue + 2 * ms.stddev_revenue, 2)   AS upper_bound_2sd,
+    -- ±2 standard deviation bounds for band chart
+    CAST(ms.avg_revenue - 2 * ISNULL(ms.stddev_revenue, 0) AS DECIMAL(14,2)) AS lower_bound_2sd,
+    CAST(ms.avg_revenue + 2 * ISNULL(ms.stddev_revenue, 0) AS DECIMAL(14,2)) AS upper_bound_2sd,
 
-    -- Count anomalous transactions in this month
-    COALESCE((
+    -- Anomaly count per month
+    ISNULL((
         SELECT COUNT(*)
-        FROM rpt_anomalies a
-        WHERE strftime('%Y-%m', a.txn_date) = ms.txn_month_label
-    ), 0)                                               AS anomaly_count,
+        FROM dbo.rpt_anomalies a
+        WHERE FORMAT(a.txn_date, 'yyyy-MM') = ms.txn_month_label
+    ), 0)                                       AS anomaly_count,
 
-    COALESCE((
-        SELECT ROUND(SUM(a.revenue), 2)
-        FROM rpt_anomalies a
-        WHERE strftime('%Y-%m', a.txn_date) = ms.txn_month_label
-    ), 0)                                               AS anomalous_revenue
+    -- Anomalous revenue total per month
+    ISNULL((
+        SELECT CAST(SUM(a.revenue) AS DECIMAL(16,2))
+        FROM dbo.rpt_anomalies a
+        WHERE FORMAT(a.txn_date, 'yyyy-MM') = ms.txn_month_label
+    ), 0)                                       AS anomalous_revenue
 
-FROM monthly_stats ms
-ORDER BY ms.txn_year, ms.txn_month;
-
+FROM monthly_stats ms;
+GO
 
 -- =============================================================================
--- vw_product_analysis.sql — Product & Channel deep-dive
--- Power BI Page 3
+-- vw_product_analysis.sql
+-- Platform : MS SQL Server 2019+ (T-SQL)
+-- Author   : Olayinka Somuyiwa
+-- Purpose  : Product and category performance with rankings.
+--            Consumed by Power BI Page 3 — Product & Channel Analysis.
 -- =============================================================================
 
-DROP VIEW IF EXISTS vw_product_analysis;
-
-CREATE VIEW vw_product_analysis AS
+CREATE OR ALTER VIEW dbo.vw_product_analysis AS
 WITH product_totals AS (
     SELECT
         product_category,
@@ -92,63 +78,34 @@ WITH product_totals AS (
         SUM(units_sold)         AS units_sold,
         COUNT(*)                AS transaction_count,
         AVG(discount_pct)       AS avg_discount_pct,
-        -- Rank within category by revenue
         RANK() OVER (
             PARTITION BY product_category, txn_year
             ORDER BY SUM(revenue) DESC
         )                       AS rank_in_category,
-        -- Rank overall by revenue
         RANK() OVER (
             PARTITION BY txn_year
             ORDER BY SUM(revenue) DESC
         )                       AS overall_rank
-    FROM core_sales
+    FROM dbo.core_sales
     GROUP BY product_category, product_name, txn_year
-),
-channel_revenue AS (
-    SELECT
-        channel,
-        txn_year,
-        ROUND(SUM(revenue), 2)      AS channel_revenue,
-        ROUND(AVG(profit_margin) * 100, 2) AS channel_margin_pct,
-        COUNT(*)                    AS transactions,
-        COUNT(DISTINCT customer_id) AS unique_customers
-    FROM core_sales
-    GROUP BY channel, txn_year
-),
-segment_revenue AS (
-    SELECT
-        customer_segment,
-        txn_year,
-        ROUND(SUM(revenue), 2)              AS segment_revenue,
-        ROUND(AVG(profit_margin) * 100, 2)  AS segment_margin_pct,
-        COUNT(DISTINCT customer_id)         AS unique_customers,
-        ROUND(AVG(discount_pct), 2)         AS avg_discount_pct
-    FROM core_sales
-    GROUP BY customer_segment, txn_year
 )
--- Product view (primary)
 SELECT
-    'PRODUCT'                           AS view_type,
     pt.product_category,
     pt.product_name,
     pt.txn_year,
-    ROUND(pt.total_revenue, 2)          AS total_revenue,
-    ROUND(pt.total_gross_profit, 2)     AS total_gross_profit,
-    ROUND(pt.avg_profit_margin * 100, 2) AS profit_margin_pct,
+    CAST(pt.total_revenue AS DECIMAL(16,2))             AS total_revenue,
+    CAST(pt.total_gross_profit AS DECIMAL(16,2))        AS total_gross_profit,
+    CAST(pt.avg_profit_margin * 100 AS DECIMAL(8,2))    AS profit_margin_pct,
     pt.units_sold,
     pt.transaction_count,
-    ROUND(pt.avg_discount_pct, 2)       AS avg_discount_pct,
+    CAST(pt.avg_discount_pct AS DECIMAL(6,2))           AS avg_discount_pct,
     pt.rank_in_category,
     pt.overall_rank,
-    -- Revenue share within category
-    ROUND(
+    -- Revenue share within category and year
+    CAST(
         pt.total_revenue /
-        SUM(pt.total_revenue) OVER (PARTITION BY pt.product_category, pt.txn_year) * 100, 2
-    )                                   AS category_share_pct,
-    NULL AS channel,
-    NULL AS customer_segment
-
-FROM product_totals pt
-
-ORDER BY pt.txn_year, pt.overall_rank;
+        NULLIF(SUM(pt.total_revenue) OVER (PARTITION BY pt.product_category, pt.txn_year), 0)
+        * 100 AS DECIMAL(8,2)
+    )                                                   AS category_share_pct
+FROM product_totals pt;
+GO

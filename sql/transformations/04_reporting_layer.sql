@@ -1,19 +1,28 @@
 -- =============================================================================
 -- 04_reporting_layer.sql
--- Enterprise BI Reporting System — Core → Reporting Aggregation Layer
---
--- Purpose:
---   Pre-aggregate data into reporting tables consumed by Power BI.
---   Runs after core layer completes. Full refresh on each pipeline run.
+-- Automated Business Intelligence Reporting System
+-- Platform : MS SQL Server 2019+ (T-SQL)
+-- Author   : Olayinka Somuyiwa
+-- Purpose  : Core → Reporting layer aggregation.
+--            Pre-aggregated tables consumed directly by Power BI.
+--            Full refresh on each pipeline run.
 -- =============================================================================
 
--- ─────────────────────────────────────────────────────────────────────────────
--- 1. MONTHLY REVENUE TABLE
--- ─────────────────────────────────────────────────────────────────────────────
+USE [bi_reporting_db];
+GO
 
-DELETE FROM rpt_monthly_revenue;
+DECLARE @run_date DATE = CAST(GETDATE() AS DATE);
 
-INSERT INTO rpt_monthly_revenue (
+INSERT INTO dbo.pipeline_log (run_date, stage, status, message)
+VALUES (@run_date, 'Reporting', 'Started', 'Reporting layer aggregation initiated');
+
+-- =============================================================================
+-- 1. MONTHLY REVENUE SUMMARY
+-- =============================================================================
+
+TRUNCATE TABLE dbo.rpt_monthly_revenue;
+
+INSERT INTO dbo.rpt_monthly_revenue (
     month_label,
     txn_year,
     txn_month,
@@ -34,17 +43,16 @@ SELECT
     ROUND(AVG(profit_margin), 6)            AS avg_profit_margin,
     COUNT(*)                                AS transaction_count,
     SUM(units_sold)                         AS units_sold
-FROM core_sales
-GROUP BY txn_month_label, txn_year, txn_month
-ORDER BY txn_year, txn_month;
+FROM dbo.core_sales
+GROUP BY txn_month_label, txn_year, txn_month;
 
--- ─────────────────────────────────────────────────────────────────────────────
--- 2. REGIONAL SUMMARY TABLE
--- ─────────────────────────────────────────────────────────────────────────────
+-- =============================================================================
+-- 2. REGIONAL SUMMARY
+-- =============================================================================
 
-DELETE FROM rpt_regional_summary;
+TRUNCATE TABLE dbo.rpt_regional_summary;
 
-INSERT INTO rpt_regional_summary (
+INSERT INTO dbo.rpt_regional_summary (
     region,
     txn_year,
     total_revenue,
@@ -61,17 +69,16 @@ SELECT
     ROUND(SUM(gross_profit), 2)     AS total_gross_profit,
     ROUND(AVG(profit_margin), 6)    AS avg_profit_margin,
     COUNT(*)                        AS transaction_count
-FROM core_sales
-GROUP BY region, txn_year
-ORDER BY txn_year, region;
+FROM dbo.core_sales
+GROUP BY region, txn_year;
 
--- ─────────────────────────────────────────────────────────────────────────────
--- 3. PRODUCT SUMMARY TABLE
--- ─────────────────────────────────────────────────────────────────────────────
+-- =============================================================================
+-- 3. PRODUCT SUMMARY
+-- =============================================================================
 
-DELETE FROM rpt_product_summary;
+TRUNCATE TABLE dbo.rpt_product_summary;
 
-INSERT INTO rpt_product_summary (
+INSERT INTO dbo.rpt_product_summary (
     product_category,
     product_name,
     txn_year,
@@ -90,38 +97,51 @@ SELECT
     ROUND(AVG(profit_margin), 6)    AS avg_profit_margin,
     SUM(units_sold)                 AS units_sold,
     COUNT(*)                        AS transaction_count
-FROM core_sales
-GROUP BY product_category, product_name, txn_year
-ORDER BY txn_year, total_revenue DESC;
+FROM dbo.core_sales
+GROUP BY product_category, product_name, txn_year;
 
--- ─────────────────────────────────────────────────────────────────────────────
--- REPORTING LAYER VALIDATION
--- ─────────────────────────────────────────────────────────────────────────────
+-- =============================================================================
+-- LOG COMPLETION
+-- =============================================================================
 
-SELECT 'MONTHLY_ROWS'   AS table_name, COUNT(*) AS row_count FROM rpt_monthly_revenue
+UPDATE dbo.pipeline_log
+SET
+    status            = 'Completed',
+    records_processed = (SELECT COUNT(*) FROM dbo.rpt_monthly_revenue)
+                      + (SELECT COUNT(*) FROM dbo.rpt_regional_summary)
+                      + (SELECT COUNT(*) FROM dbo.rpt_product_summary),
+    end_time          = SYSDATETIME(),
+    message           = 'Reporting layer aggregation complete'
+WHERE run_date = @run_date AND stage = 'Reporting' AND status = 'Started';
+
+-- =============================================================================
+-- VALIDATION
+-- =============================================================================
+
+SELECT 'rpt_monthly_revenue'  AS table_name, COUNT(*) AS row_count FROM dbo.rpt_monthly_revenue
 UNION ALL
-SELECT 'REGIONAL_ROWS',  COUNT(*) FROM rpt_regional_summary
+SELECT 'rpt_regional_summary', COUNT(*) FROM dbo.rpt_regional_summary
 UNION ALL
-SELECT 'PRODUCT_ROWS',   COUNT(*) FROM rpt_product_summary;
+SELECT 'rpt_product_summary',  COUNT(*) FROM dbo.rpt_product_summary;
 
--- Top 5 months by revenue (sanity check)
-SELECT
+-- Top 5 months by revenue
+SELECT TOP 5
     month_label,
-    ROUND(total_revenue, 0)         AS revenue,
-    ROUND(total_gross_profit, 0)    AS gross_profit,
+    CAST(total_revenue AS DECIMAL(16,0))        AS revenue,
+    CAST(total_gross_profit AS DECIMAL(16,0))   AS gross_profit,
     transaction_count
-FROM rpt_monthly_revenue
-ORDER BY total_revenue DESC
-LIMIT 5;
+FROM dbo.rpt_monthly_revenue
+ORDER BY total_revenue DESC;
 
 -- Regional performance overview
 SELECT
     region,
     txn_year,
-    ROUND(total_revenue, 0)         AS revenue,
-    ROUND(avg_profit_margin * 100, 1) AS margin_pct
-FROM rpt_regional_summary
+    CAST(total_revenue AS DECIMAL(16,0))            AS revenue,
+    CAST(avg_profit_margin * 100 AS DECIMAL(8,1))   AS margin_pct
+FROM dbo.rpt_regional_summary
 ORDER BY txn_year, total_revenue DESC;
+GO
 
 -- =============================================================================
 -- END OF REPORTING LAYER

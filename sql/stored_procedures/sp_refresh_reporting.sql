@@ -1,198 +1,274 @@
 -- =============================================================================
--- sp_refresh_reporting.sql
--- Enterprise BI Reporting System — Stored Procedure: Full Pipeline Refresh
---
--- SQL Server syntax (T-SQL). For SQLite, use Python sql_runner.py instead.
--- Uncomment and run in SQL Server Management Studio (SSMS).
+-- usp_DailyDataExtraction.sql
+-- Automated Business Intelligence Reporting System
+-- Platform  : MS SQL Server 2019+ (T-SQL)
+-- Author    : Olayinka Somuyiwa
+-- Purpose   : Automated daily data extraction — extracts and stages daily
+--             operational data for downstream transformation and reporting.
+-- Schedule  : SQL Server Agent Job — daily at 06:00
 -- =============================================================================
 
-/*
-USE [BIReportingDB];
+USE [bi_reporting_db];
 GO
 
--- Drop if exists
-IF OBJECT_ID('dbo.sp_refresh_reporting', 'P') IS NOT NULL
-    DROP PROCEDURE dbo.sp_refresh_reporting;
+CREATE OR ALTER PROCEDURE dbo.usp_DailyDataExtraction
+    @extraction_date DATE = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SET @extraction_date = ISNULL(@extraction_date, CAST(GETDATE() AS DATE));
+
+    -- Log extraction start
+    INSERT INTO dbo.pipeline_log (run_date, stage, status, message)
+    VALUES (
+        @extraction_date,
+        'Extraction',
+        'Started',
+        'Daily extraction initiated for ' + CAST(@extraction_date AS VARCHAR)
+    );
+
+    BEGIN TRY
+
+        -- Extract and stage operational data
+        INSERT INTO dbo.staging_operational_data
+            (record_date, entity_id, metric_name, metric_value, source_system)
+        SELECT
+            @extraction_date,
+            entity_id,
+            metric_name,
+            metric_value,
+            source_system
+        FROM dbo.vw_operational_source
+        WHERE record_date = @extraction_date;
+
+        -- Log completion with record count
+        UPDATE dbo.pipeline_log
+        SET
+            status            = 'Completed',
+            records_processed = @@ROWCOUNT,
+            end_time          = GETDATE()
+        WHERE run_date = @extraction_date
+          AND stage    = 'Extraction';
+
+    END TRY
+    BEGIN CATCH
+
+        UPDATE dbo.pipeline_log
+        SET
+            status        = 'Failed',
+            end_time      = SYSDATETIME(),
+            error_message = ERROR_MESSAGE()
+        WHERE run_date = @extraction_date
+          AND stage    = 'Extraction'
+          AND status   = 'Started';
+
+        THROW;
+
+    END CATCH;
+
+END;
 GO
 
-CREATE PROCEDURE dbo.sp_refresh_reporting
-    @RunDate        DATE        = NULL,     -- Override run date (default: today)
-    @LogToTable     BIT         = 1,        -- Log execution to audit table
-    @FullRefresh    BIT         = 1         -- Full or incremental refresh
+-- =============================================================================
+-- usp_TransformationLayer.sql
+-- Runs the full staging → core → reporting transformation sequence.
+-- Called by SQL Server Agent after usp_DailyDataExtraction completes.
+-- =============================================================================
+
+CREATE OR ALTER PROCEDURE dbo.usp_TransformationLayer
+    @run_date DATE = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
     SET XACT_ABORT ON;
 
-    DECLARE @StartTime      DATETIME2   = SYSDATETIME();
-    DECLARE @RunDateFinal   DATE        = COALESCE(@RunDate, CAST(GETDATE() AS DATE));
-    DECLARE @StepName       NVARCHAR(100);
-    DECLARE @RowsAffected   INT;
-    DECLARE @ErrorMsg       NVARCHAR(MAX);
+    SET @run_date = ISNULL(@run_date, CAST(GETDATE() AS DATE));
 
     BEGIN TRY
-        -- ─────────────────────────────────────────────────────────────────────
-        -- STEP 1: Refresh Staging Layer
-        -- ─────────────────────────────────────────────────────────────────────
-        SET @StepName = 'Staging Layer Refresh';
 
-        IF @FullRefresh = 1
-            TRUNCATE TABLE dbo.stg_sales_raw;
+        -- ── Step 1: Staging clean ──────────────────────────────────────────
 
-        -- In production, this would call BULK INSERT or OPENROWSET
-        -- BULK INSERT dbo.stg_sales_raw
-        --   FROM 'C:\data\sales_operations.csv'
-        --   WITH (FIRSTROW=2, FIELDTERMINATOR=',', ROWTERMINATOR='\n');
+        INSERT INTO dbo.pipeline_log (run_date, stage, status, message)
+        VALUES (@run_date, 'Staging', 'Started', 'Staging validation initiated');
 
-        SET @RowsAffected = @@ROWCOUNT;
+        -- Deduplication
+        WITH cte_dupes AS (
+            SELECT transaction_id,
+                   ROW_NUMBER() OVER (PARTITION BY transaction_id ORDER BY loaded_at) AS rn
+            FROM dbo.stg_sales_raw
+        )
+        DELETE FROM dbo.stg_sales_raw
+        WHERE transaction_id IN (SELECT transaction_id FROM cte_dupes WHERE rn > 1);
 
-        -- ─────────────────────────────────────────────────────────────────────
-        -- STEP 2: Core Layer Transformation
-        -- ─────────────────────────────────────────────────────────────────────
-        SET @StepName = 'Core Layer Transformation';
+        -- Remove invalid rows
+        DELETE FROM dbo.stg_sales_raw
+        WHERE transaction_id IS NULL OR record_date IS NULL OR revenue < 0;
 
-        IF @FullRefresh = 1
-            TRUNCATE TABLE dbo.core_sales;
+        -- Clamp discount
+        UPDATE dbo.stg_sales_raw
+        SET discount_pct = CASE
+            WHEN discount_pct < 0   THEN 0
+            WHEN discount_pct > 100 THEN 100
+            ELSE discount_pct END;
+
+        UPDATE dbo.pipeline_log
+        SET status = 'Completed', end_time = SYSDATETIME(),
+            records_processed = (SELECT COUNT(*) FROM dbo.stg_sales_raw)
+        WHERE run_date = @run_date AND stage = 'Staging' AND status = 'Started';
+
+        -- ── Step 2: Core transformation ───────────────────────────────────
+
+        INSERT INTO dbo.pipeline_log (run_date, stage, status, message)
+        VALUES (@run_date, 'Transformation', 'Started', 'Core layer transformation initiated');
+
+        TRUNCATE TABLE dbo.core_sales;
 
         INSERT INTO dbo.core_sales (
             transaction_id, txn_date, txn_year, txn_quarter, txn_month,
-            txn_month_label, product_name, product_category, region,
-            sales_rep, customer_id, customer_segment, channel,
-            units_sold, unit_price, revenue, cost, gross_profit,
-            profit_margin, discount_pct, discount_amount, is_profitable
+            txn_month_label, product_name, product_category, region, sales_rep,
+            customer_id, customer_segment, channel, units_sold, unit_price,
+            revenue, cost, gross_profit, profit_margin, discount_pct,
+            discount_amount, is_profitable
         )
         SELECT
-            transaction_id,
-            CAST(date AS DATE)                              AS txn_date,
-            YEAR(CAST(date AS DATE))                        AS txn_year,
-            DATEPART(QUARTER, CAST(date AS DATE))           AS txn_quarter,
-            MONTH(CAST(date AS DATE))                       AS txn_month,
-            FORMAT(CAST(date AS DATE), 'yyyy-MM')           AS txn_month_label,
-            TRIM(product_name),
-            TRIM(product_category),
-            TRIM(region),
-            TRIM(sales_rep),
-            TRIM(customer_id),
-            TRIM(customer_segment),
-            TRIM(channel),
-            units_sold,
-            unit_price,
-            ROUND(revenue, 2),
-            ROUND(cost, 2),
-            ROUND(revenue - cost, 2),
-            CASE WHEN revenue = 0 THEN 0
-                 ELSE ROUND((revenue - cost) / revenue, 6) END,
-            discount_pct,
-            ROUND(unit_price * units_sold * (discount_pct / 100.0), 2),
-            CASE WHEN (revenue - cost) > 0 THEN 1 ELSE 0 END
-        FROM dbo.stg_sales_raw
-        WHERE transaction_id IS NOT NULL
-          AND date IS NOT NULL
-          AND revenue IS NOT NULL;
+            s.transaction_id,
+            s.record_date,
+            YEAR(s.record_date),
+            DATEPART(QUARTER, s.record_date),
+            MONTH(s.record_date),
+            FORMAT(s.record_date, 'yyyy-MM'),
+            LTRIM(RTRIM(s.product_name)),
+            LTRIM(RTRIM(s.product_category)),
+            LTRIM(RTRIM(s.region)),
+            LTRIM(RTRIM(s.sales_rep)),
+            LTRIM(RTRIM(s.customer_id)),
+            LTRIM(RTRIM(s.customer_segment)),
+            LTRIM(RTRIM(s.channel)),
+            s.units_sold,
+            s.unit_price,
+            ROUND(s.revenue, 2),
+            ROUND(s.cost, 2),
+            ROUND(s.revenue - s.cost, 2),
+            ROUND(ISNULL((s.revenue - s.cost) / NULLIF(s.revenue, 0), 0), 6),
+            s.discount_pct,
+            ROUND(s.unit_price * s.units_sold * (s.discount_pct / 100.0), 2),
+            CASE WHEN (s.revenue - s.cost) > 0 THEN 1 ELSE 0 END
+        FROM dbo.stg_sales_raw s
+        WHERE s.transaction_id IS NOT NULL
+          AND s.record_date    IS NOT NULL
+          AND s.revenue        IS NOT NULL;
 
-        SET @RowsAffected = @@ROWCOUNT;
+        UPDATE dbo.pipeline_log
+        SET status = 'Completed', end_time = SYSDATETIME(),
+            records_processed = (SELECT COUNT(*) FROM dbo.core_sales)
+        WHERE run_date = @run_date AND stage = 'Transformation' AND status = 'Started';
 
-        -- ─────────────────────────────────────────────────────────────────────
-        -- STEP 3: Reporting Layer Aggregation
-        -- ─────────────────────────────────────────────────────────────────────
-        SET @StepName = 'Reporting Layer — Monthly';
+        -- ── Step 3: Reporting aggregation ─────────────────────────────────
+
+        INSERT INTO dbo.pipeline_log (run_date, stage, status, message)
+        VALUES (@run_date, 'Reporting', 'Started', 'Reporting aggregation initiated');
 
         TRUNCATE TABLE dbo.rpt_monthly_revenue;
+        INSERT INTO dbo.rpt_monthly_revenue (month_label, txn_year, txn_month,
+            total_revenue, total_cost, total_gross_profit, avg_profit_margin,
+            transaction_count, units_sold)
+        SELECT txn_month_label, txn_year, txn_month,
+            ROUND(SUM(revenue),2), ROUND(SUM(cost),2), ROUND(SUM(gross_profit),2),
+            ROUND(AVG(profit_margin),6), COUNT(*), SUM(units_sold)
+        FROM dbo.core_sales GROUP BY txn_month_label, txn_year, txn_month;
 
-        INSERT INTO dbo.rpt_monthly_revenue
-        SELECT
-            txn_month_label,
-            txn_year,
-            txn_month,
-            ROUND(SUM(revenue), 2),
-            ROUND(SUM(cost), 2),
-            ROUND(SUM(gross_profit), 2),
-            ROUND(AVG(profit_margin), 6),
-            COUNT(*),
-            SUM(units_sold)
-        FROM dbo.core_sales
-        GROUP BY txn_month_label, txn_year, txn_month;
-
-        -- Regional Summary
-        SET @StepName = 'Reporting Layer — Regional';
         TRUNCATE TABLE dbo.rpt_regional_summary;
+        INSERT INTO dbo.rpt_regional_summary (region, txn_year,
+            total_revenue, total_cost, total_gross_profit, avg_profit_margin, transaction_count)
+        SELECT region, txn_year,
+            ROUND(SUM(revenue),2), ROUND(SUM(cost),2), ROUND(SUM(gross_profit),2),
+            ROUND(AVG(profit_margin),6), COUNT(*)
+        FROM dbo.core_sales GROUP BY region, txn_year;
 
-        INSERT INTO dbo.rpt_regional_summary
-        SELECT
-            region, txn_year,
-            ROUND(SUM(revenue), 2),
-            ROUND(SUM(cost), 2),
-            ROUND(SUM(gross_profit), 2),
-            ROUND(AVG(profit_margin), 6),
-            COUNT(*)
-        FROM dbo.core_sales
-        GROUP BY region, txn_year;
-
-        -- Product Summary
-        SET @StepName = 'Reporting Layer — Product';
         TRUNCATE TABLE dbo.rpt_product_summary;
+        INSERT INTO dbo.rpt_product_summary (product_category, product_name, txn_year,
+            total_revenue, total_gross_profit, avg_profit_margin, units_sold, transaction_count)
+        SELECT product_category, product_name, txn_year,
+            ROUND(SUM(revenue),2), ROUND(SUM(gross_profit),2),
+            ROUND(AVG(profit_margin),6), SUM(units_sold), COUNT(*)
+        FROM dbo.core_sales GROUP BY product_category, product_name, txn_year;
 
-        INSERT INTO dbo.rpt_product_summary
-        SELECT
-            product_category, product_name, txn_year,
-            ROUND(SUM(revenue), 2),
-            ROUND(SUM(gross_profit), 2),
-            ROUND(AVG(profit_margin), 6),
-            SUM(units_sold),
-            COUNT(*)
-        FROM dbo.core_sales
-        GROUP BY product_category, product_name, txn_year;
+        UPDATE dbo.pipeline_log
+        SET status = 'Completed', end_time = SYSDATETIME(),
+            records_processed = (SELECT COUNT(*) FROM dbo.rpt_monthly_revenue)
+        WHERE run_date = @run_date AND stage = 'Reporting' AND status = 'Started';
 
-        -- ─────────────────────────────────────────────────────────────────────
-        -- STEP 4: Audit Log
-        -- ─────────────────────────────────────────────────────────────────────
-        IF @LogToTable = 1
-        BEGIN
-            INSERT INTO dbo.pipeline_audit_log (
-                run_date, pipeline_name, status, rows_processed,
-                duration_seconds, completed_at
-            )
-            VALUES (
-                @RunDateFinal,
-                'sp_refresh_reporting',
-                'SUCCESS',
-                @RowsAffected,
-                DATEDIFF(SECOND, @StartTime, SYSDATETIME()),
-                SYSDATETIME()
-            );
-        END;
-
-        PRINT 'Pipeline completed successfully. Duration: '
-              + CAST(DATEDIFF(SECOND, @StartTime, SYSDATETIME()) AS VARCHAR) + 's';
+        PRINT 'Full pipeline transformation complete for ' + CAST(@run_date AS VARCHAR);
 
     END TRY
     BEGIN CATCH
-        SET @ErrorMsg = ERROR_MESSAGE();
 
-        IF @LogToTable = 1
-        BEGIN
-            INSERT INTO dbo.pipeline_audit_log (
-                run_date, pipeline_name, status, error_message, completed_at
-            )
-            VALUES (
-                @RunDateFinal, 'sp_refresh_reporting',
-                'FAILED', @ErrorMsg, SYSDATETIME()
-            );
-        END;
+        UPDATE dbo.pipeline_log
+        SET status = 'Failed', end_time = SYSDATETIME(), error_message = ERROR_MESSAGE()
+        WHERE run_date = @run_date AND status = 'Started';
 
-        RAISERROR (@ErrorMsg, 16, 1);
-        RETURN -1;
+        THROW;
+
     END CATCH;
 
-    RETURN 0;
 END;
 GO
 
--- ── EXECUTE ──────────────────────────────────────────────────────────────────
--- EXEC dbo.sp_refresh_reporting @FullRefresh = 1, @LogToTable = 1;
--- GO
-*/
+-- =============================================================================
+-- EXECUTION — Uncomment to run manually in SSMS
+-- =============================================================================
 
--- SQLite equivalent (no stored procedure support — handled in Python sql_runner.py)
--- See: python/transformation/sql_runner.py → run_all_transformations()
-SELECT 'SQL Server stored procedure defined above. For SQLite, use sql_runner.py.' AS note;
+-- Run extraction for today
+-- EXEC dbo.usp_DailyDataExtraction;
+
+-- Run full transformation pipeline
+-- EXEC dbo.usp_TransformationLayer;
+
+-- View pipeline log
+-- SELECT * FROM dbo.pipeline_log ORDER BY log_id DESC;
+
+PRINT 'Stored procedures created: usp_DailyDataExtraction, usp_TransformationLayer';
+GO
+
+-- =============================================================================
+-- SQL SERVER AGENT JOB SETUP (run in SSMS after procedures are created)
+-- =============================================================================
+
+/*
+-- Step 1: Create the Agent Job
+EXEC msdb.dbo.sp_add_job
+    @job_name = N'BI_Pipeline_Daily_Run';
+
+-- Step 2: Add extraction step (06:00)
+EXEC msdb.dbo.sp_add_jobstep
+    @job_name  = N'BI_Pipeline_Daily_Run',
+    @step_name = N'Step1_DailyExtraction',
+    @command   = N'EXEC dbo.usp_DailyDataExtraction;',
+    @database_name = N'bi_reporting_db';
+
+-- Step 3: Add transformation step
+EXEC msdb.dbo.sp_add_jobstep
+    @job_name  = N'BI_Pipeline_Daily_Run',
+    @step_name = N'Step2_Transformation',
+    @command   = N'EXEC dbo.usp_TransformationLayer;',
+    @database_name = N'bi_reporting_db';
+
+-- Step 4: Schedule daily at 06:00
+EXEC msdb.dbo.sp_add_schedule
+    @schedule_name     = N'DailyAt0600',
+    @freq_type         = 4,           -- Daily
+    @freq_interval     = 1,
+    @active_start_time = 060000;      -- 06:00:00
+
+EXEC msdb.dbo.sp_attach_schedule
+    @job_name      = N'BI_Pipeline_Daily_Run',
+    @schedule_name = N'DailyAt0600';
+
+EXEC msdb.dbo.sp_add_jobserver
+    @job_name = N'BI_Pipeline_Daily_Run';
+*/
+GO
+-- =============================================================================
+-- END OF STORED PROCEDURES
+-- =============================================================================
