@@ -93,14 +93,14 @@ The Automated BI Reporting System follows a classic **ELT (Extract, Load, Transf
 ### Medallion Architecture (Staging → Core → Reporting)
 The 3-layer SQL approach cleanly separates concerns:
 - **Staging** catches data quality issues early without corrupting downstream data
-- **Core** is the single source of truth — business logic lives here, not in reports
+- **Core** is the single source of truth - business logic lives here, not in reports
 - **Reporting** pre-aggregates heavy queries so Power BI responds instantly
 
 ### Full Refresh vs Incremental
 This pipeline uses **full refresh** (truncate and reload) for simplicity. In a production environment with millions of rows, you would replace this with incremental logic using a `loaded_at` watermark column in the staging table.
 
 ### SQLite for Local Dev, SQL Server for Production
-The `DBConnector` class abstracts the database engine. Switching from SQLite to SQL Server requires only a `config.yaml` change — all SQL files use ANSI-compatible syntax.
+The `DBConnector` class abstracts the database engine. Switching from SQLite to SQL Server requires only a `config.yaml` change - all SQL files use ANSI-compatible syntax.
 
 ### Statistical Anomaly Detection
 Z-scores are computed **within product_category groups** rather than globally, because a $60,000 server sale is not anomalous but a $60,000 webcam sale is. IQR detection catches discount outliers that Z-score may miss due to non-normality.
