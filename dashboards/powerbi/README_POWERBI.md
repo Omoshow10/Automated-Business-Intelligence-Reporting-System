@@ -33,21 +33,21 @@ MS SQL Server (bi_reporting_db)
 
 ## Setup: Connect Power BI to MS SQL Server
 
-### Step 1 — Open the Report
+### Step 1 - Open the Report
 Open `BI_Reporting_System.pbix` in **Power BI Desktop** (free download from Microsoft).
 
-### Step 2 — Update the Data Source Connection
-1. **Home → Transform Data → Data Source Settings**
-2. Select the SQL Server source → **Change Source**
+### Step 2 - Update the Data Source Connection
+1. **Home - Transform Data - Data Source Settings**
+2. Select the SQL Server source - **Change Source**
 3. Set **Server:** `your_server` (match `config/config.yaml`)
 4. Set **Database:** `bi_reporting_db`
 5. Click **OK**
 
-### Step 3 — Authenticate
-- **Windows Authentication** — select *Use my current credentials* (matches `trusted_connection: true` in config)
-- **SQL Server Authentication** — enter the username and password configured in `config/config.yaml`
+### Step 3 - Authenticate
+- **Windows Authentication** - select *Use my current credentials* (matches `trusted_connection: true` in config)
+- **SQL Server Authentication** - enter the username and password configured in `config/config.yaml`
 
-### Step 4 — Select Tables and Views
+### Step 4 - Select Tables and Views
 On first connection, import all of the following from the `dbo` schema:
 
 | Object | Type | Used On |
@@ -63,31 +63,31 @@ On first connection, import all of the following from the `dbo` schema:
 | `vw_anomaly_detection` | View | Page 4 |
 | `vw_product_analysis` | View | Page 3 |
 
-### Step 5 — Refresh
-Click **Home → Refresh** to load data from the live SQL Server database.
+### Step 5 - Refresh
+Click **Home - Refresh** to load data from the live SQL Server database.
 
 ---
 
 ## Dashboard Pages
 
-### Page 1 — Executive Overview Dashboard
+### Page 1 - Executive Overview Dashboard
 
 **Purpose:** Automated KPI summary with data freshness timestamp, pipeline status indicator, and key operational metrics.
 
 **Visuals:**
 
-| Visual | Type | Data Source | Measure |
-|---|---|---|---|
-| Total Revenue | KPI Card | `rpt_monthly_revenue` | `SUM(total_revenue)` |
-| Gross Profit | KPI Card | `rpt_monthly_revenue` | `SUM(total_gross_profit)` |
-| YoY Revenue Growth % | KPI Card | `vw_revenue_trends` | `yoy_growth_pct` latest month |
-| Profit Margin % | KPI Card | `core_sales` | `gross_profit / revenue * 100` |
-| Monthly Revenue Trend | Line Chart | `vw_revenue_trends` | `total_revenue` by `month_label` — 2022/2023/2024 |
-| Profit Margin Trend | Area Chart | `vw_revenue_trends` | `profit_margin_pct` by `month_label` |
-| Revenue by Customer Segment | Donut Chart | `core_sales` | `SUM(revenue)` by `customer_segment` |
-| Revenue by Channel | Horizontal Bar | `core_sales` | `SUM(revenue)` by `channel` |
-| Revenue by Region | Clustered Bar | `rpt_regional_summary` | `total_revenue` by `region` |
-| Pipeline Status | Table | `dbo.pipeline_log` | `stage`, `status`, `records_processed`, `duration_seconds` — today |
+| Visual                      | Type           | Data Source            | Measure                                                            |
+| --------------------------- | -------------- | ---------------------- | ------------------------------------------------------------------ |
+| Total Revenue               | KPI Card       | `rpt_monthly_revenue`  | `SUM(total_revenue)`                                               |
+| Gross Profit                | KPI Card       | `rpt_monthly_revenue`  | `SUM(total_gross_profit)`                                          |
+| YoY Revenue Growth %        | KPI Card       | `vw_revenue_trends`    | `yoy_growth_pct` latest month                                      |
+| Profit Margin %             | KPI Card       | `core_sales`           | `gross_profit / revenue * 100`                                     |
+| Monthly Revenue Trend       | Line Chart     | `vw_revenue_trends`    | `total_revenue` by `month_label` - 2022/2023/2024                  |
+| Profit Margin Trend         | Area Chart     | `vw_revenue_trends`    | `profit_margin_pct` by `month_label`                               |
+| Revenue by Customer Segment | Donut Chart    | `core_sales`           | `SUM(revenue)` by `customer_segment`                               |
+| Revenue by Channel          | Horizontal Bar | `core_sales`           | `SUM(revenue)` by `channel`                                        |
+| Revenue by Region           | Clustered Bar  | `rpt_regional_summary` | `total_revenue` by `region`                                        |
+| Pipeline Status             | Table          | `dbo.pipeline_log`     | `stage`, `status`, `records_processed`, `duration_seconds` — today |
 
 **Key DAX Measures:**
 ```dax
@@ -135,25 +135,25 @@ Pipeline Status Today =
 
 ---
 
-### Page 2 — Pipeline Run Log & Monitoring Panel
+### Page 2 - Pipeline Run Log & Monitoring Panel
 
 **Purpose:** Pipeline execution log showing daily run timestamps, records processed per run, processing duration, and status (Completed / Failed).
 
 **Visuals:**
 
-| Visual | Type | Data Source | Measure |
-|---|---|---|---|
-| Total Runs (30d) | KPI Card | `dbo.pipeline_log` | `COUNT(log_id)` last 30 days |
-| Successful Runs | KPI Card | `dbo.pipeline_log` | `COUNTROWS` where `status = 'Completed'` |
-| Failed Runs | KPI Card | `dbo.pipeline_log` | `COUNTROWS` where `status = 'Failed'` |
-| Avg Duration | KPI Card | `dbo.pipeline_log` | `AVERAGE(duration_seconds)` |
-| Avg Records/Run | KPI Card | `dbo.pipeline_log` | `AVERAGE(records_processed)` |
-| Run Duration Trend | Bar Chart | `dbo.pipeline_log` | `duration_seconds` by `run_date` — failed runs highlighted red |
-| Records Processed Trend | Line Chart | `dbo.pipeline_log` | `records_processed` by `run_date` |
-| Stage Avg Duration | Horizontal Bar | `dbo.pipeline_log` | `AVERAGE(duration_seconds)` by `stage` |
-| 30-Day Success Rate | Donut | `dbo.pipeline_log` | Completed vs Failed count |
-| Stage Success Summary | Matrix | `dbo.pipeline_log` | Runs / Success / Failed by `stage` |
-| Full Run Log | Table | `dbo.pipeline_log` | All columns — sorted by `log_id` DESC |
+| Visual                  | Type           | Data Source        | Measure                                                        |
+| ----------------------- | -------------- | ------------------ | -------------------------------------------------------------- |
+| Total Runs (30d)        | KPI Card       | `dbo.pipeline_log` | `COUNT(log_id)` last 30 days                                   |
+| Successful Runs         | KPI Card       | `dbo.pipeline_log` | `COUNTROWS` where `status = 'Completed'`                       |
+| Failed Runs             | KPI Card       | `dbo.pipeline_log` | `COUNTROWS` where `status = 'Failed'`                          |
+| Avg Duration            | KPI Card       | `dbo.pipeline_log` | `AVERAGE(duration_seconds)`                                    |
+| Avg Records/Run         | KPI Card       | `dbo.pipeline_log` | `AVERAGE(records_processed)`                                   |
+| Run Duration Trend      | Bar Chart      | `dbo.pipeline_log` | `duration_seconds` by `run_date` - failed runs highlighted red |
+| Records Processed Trend | Line Chart     | `dbo.pipeline_log` | `records_processed` by `run_date`                              |
+| Stage Avg Duration      | Horizontal Bar | `dbo.pipeline_log` | `AVERAGE(duration_seconds)` by `stage`                         |
+| 30-Day Success Rate     | Donut          | `dbo.pipeline_log` | Completed vs Failed count                                      |
+| Stage Success Summary   | Matrix         | `dbo.pipeline_log` | Runs / Success / Failed by `stage`                             |
+| Full Run Log            | Table          | `dbo.pipeline_log` | All columns - sorted by `log_id` DESC                          |
 
 **Key DAX Measures:**
 ```dax
@@ -182,7 +182,7 @@ Run Status Color =
 
 ---
 
-### Page 3 — Automated Report Output — Management Report
+### Page 3 - Automated Report Output - Management Report
 
 **Purpose:** Auto-generated management report showing formatted KPI tables, trend charts, and summary outputs produced without manual intervention.
 
@@ -238,24 +238,24 @@ Avg Discount % =
 
 ---
 
-### Page 4 — Data Quality Validation Report
+### Page 4 - Data Quality Validation Report
 
-**Purpose:** Automated data quality check output — null value counts, validation pass/fail status, and data completeness metrics per pipeline run.
+**Purpose:** Automated data quality check output - null value counts, validation pass/fail status, and data completeness metrics per pipeline run.
 
 **Visuals:**
 
-| Visual | Type | Data Source | Measure |
-|---|---|---|---|
-| Overall Quality Score | KPI Card | `dbo.pipeline_log` | Rows loaded / (rows loaded + rejected) * 100 |
-| Rows Loaded | KPI Card | `dbo.pipeline_log` | `SUM(records_processed)` where stage = 'Staging' |
-| Rows Rejected | KPI Card | Calculated | Total rows − loaded rows |
-| Issues Auto-Fixed | KPI Card | Calculated | Clamped discount + null unit fixes |
-| Duplicates Removed | KPI Card | Calculated | From deduplication CTE in staging |
-| Validation Check Results | Table | `dbo.pipeline_log` + Python output | Check name / rows affected / action / result |
-| Null Count by Column | Bar Chart | Calculated | Null counts per column — green = 0, orange = has nulls |
-| Data Completeness % | Horizontal Bar | Calculated | Completeness per column |
-| Quality Score Trend (30d) | Line + Bar | `dbo.pipeline_log` | Quality score line + rejected rows bar |
-| Staging Log Extract | Table | `dbo.pipeline_log` | `run_date`, `status`, `records_processed`, `message` — stage = 'Staging' |
+| Visual                    | Type           | Data Source                        | Measure                                                                  |
+| ------------------------- | -------------- | ---------------------------------- | ------------------------------------------------------------------------ |
+| Overall Quality Score     | KPI Card       | `dbo.pipeline_log`                 | Rows loaded / (rows loaded + rejected) * 100                             |
+| Rows Loaded               | KPI Card       | `dbo.pipeline_log`                 | `SUM(records_processed)` where stage = 'Staging'                         |
+| Rows Rejected             | KPI Card       | Calculated                         | Total rows − loaded rows                                                 |
+| Issues Auto-Fixed         | KPI Card       | Calculated                         | Clamped discount + null unit fixes                                       |
+| Duplicates Removed        | KPI Card       | Calculated                         | From deduplication CTE in staging                                        |
+| Validation Check Results  | Table          | `dbo.pipeline_log` + Python output | Check name / rows affected / action / result                             |
+| Null Count by Column      | Bar Chart      | Calculated                         | Null counts per column - green = 0, orange = has nulls                   |
+| Data Completeness %       | Horizontal Bar | Calculated                         | Completeness per column                                                  |
+| Quality Score Trend (30d) | Line + Bar     | `dbo.pipeline_log`                 | Quality score line + rejected rows bar                                   |
+| Staging Log Extract       | Table          | `dbo.pipeline_log`                 | `run_date`, `status`, `records_processed`, `message` - stage = 'Staging' |
 
 **Key DAX Measures:**
 ```dax
@@ -289,10 +289,10 @@ Pipeline Failures (30d) =
 ```
 
 **Conditional Formatting:**
-- Validation result = `PASS` → green cell background
-- Validation result = `WARN` → orange cell background
-- Validation result = `FIXED` → blue cell background
-- `status = 'Failed'` in log table → red row background
+- Validation result = `PASS` - green cell background
+- Validation result = `WARN` - orange cell background
+- Validation result = `FIXED` - blue cell background
+- `status = 'Failed'` in log table - red row background
 
 **Slicers:** Date range · Stage · Status
 
@@ -356,7 +356,7 @@ dbo.pipeline_log            ← standalone audit table (not joined to sales fact
    On-premises data gateway required for SQL Server connectivity
 ```
 
-### Pipeline → Power BI Timing
+### Pipeline - Power BI Timing
 
 ```
 06:00  usp_DailyDataExtraction  (SQL Server Agent)
@@ -370,13 +370,13 @@ dbo.pipeline_log            ← standalone audit table (not joined to sales fact
 
 ## Troubleshooting
 
-| Issue | Cause | Fix |
-|---|---|---|
-| "Cannot connect to server" | Wrong server name or firewall | Verify `server` in `config/config.yaml` matches SQL Server instance name |
-| "Login failed for user" | Authentication mismatch | Switch between Windows auth and SQL auth in Power BI data source settings |
-| "Cannot find table dbo.core_sales" | Schema not created | Run `sql/transformations/01_create_schema.sql` in SSMS then re-run pipeline |
-| Blank visuals after refresh | Pipeline did not complete | Check `SELECT * FROM dbo.pipeline_log ORDER BY log_id DESC` — look for 'Failed' status |
-| Map visual shows no data | Region names not recognised | Verify regions in `core_sales` match Power BI geography: North/South/East/West/International |
-| Stale data in dashboard | Refresh not triggered | Click **Refresh** in Power BI Desktop or wait for scheduled 07:00 refresh |
-| "Cannot find column duration_seconds" | Computed column not returning | Verify `start_time` and `end_time` are both populated in `dbo.pipeline_log` |
-| Gateway connection error | Gateway not configured | Install On-premises data gateway; configure connection to `bi_reporting_db` |
+| Issue                                 | Cause                         | Fix                                                                                          |
+| ------------------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------- |
+| "Cannot connect to server"            | Wrong server name or firewall | Verify `server` in `config/config.yaml` matches SQL Server instance name                     |
+| "Login failed for user"               | Authentication mismatch       | Switch between Windows auth and SQL auth in Power BI data source settings                    |
+| "Cannot find table dbo.core_sales"    | Schema not created            | Run `sql/transformations/01_create_schema.sql` in SSMS then re-run pipeline                  |
+| Blank visuals after refresh           | Pipeline did not complete     | Check `SELECT * FROM dbo.pipeline_log ORDER BY log_id DESC` - look for 'Failed' status       |
+| Map visual shows no data              | Region names not recognised   | Verify regions in `core_sales` match Power BI geography: North/South/East/West/International |
+| Stale data in dashboard               | Refresh not triggered         | Click **Refresh** in Power BI Desktop or wait for scheduled 07:00 refresh                    |
+| "Cannot find column duration_seconds" | Computed column not returning | Verify `start_time` and `end_time` are both populated in `dbo.pipeline_log`                  |
+| Gateway connection error              | Gateway not configured        | Install On-premises data gateway; configure connection to `bi_reporting_db`                  |
