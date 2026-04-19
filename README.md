@@ -287,14 +287,14 @@ DIVIDE(SUM(core\_sales\[gross\_profit]), SUM(core\_sales\[revenue]), 0) \* 100
 
 Pipeline execution log showing daily run timestamps, records processed per run, processing duration, and status (Completed / Failed).
 
-|Visual|Type|Source|
-|-|-|-|
-|30-Day Success Rate|Donut|`dbo.pipeline\_log`|
-|Run Duration Trend|Bar Chart|`dbo.pipeline\_log` — per run duration|
-|Records Processed Trend|Line Chart|`dbo.pipeline\_log` — records\_processed|
-|Stage Breakdown|Horizontal Bar|`dbo.pipeline\_log` — avg by stage|
-|Full Run Log|Table|`dbo.pipeline\_log` — all columns|
-|Stage Success Summary|Matrix|`dbo.pipeline\_log` — grouped by stage|
+| Visual                  | Type           | Source                                   |
+| ----------------------- | -------------- | ---------------------------------------- |
+| 30-Day Success Rate     | Donut          | `dbo.pipeline\_log`                      |
+| Run Duration Trend      | Bar Chart      | `dbo.pipeline\_log` - per run duration   |
+| Records Processed Trend | Line Chart     | `dbo.pipeline\_log` - records\_processed |
+| Stage Breakdown         | Horizontal Bar | `dbo.pipeline\_log` - avg by stage       |
+| Full Run Log            | Table          | `dbo.pipeline\_log` - all columns        |
+| Stage Success Summary   | Matrix         | `dbo.pipeline\_log` - grouped by stage   |
 
 #### Page 3 - Automated Report Output - Management Report
 
@@ -313,14 +313,14 @@ Auto-generated management report showing formatted KPI tables, trend charts, and
 
 Automated data quality check output — null value counts, validation pass/fail status, and data completeness metrics per pipeline run.
 
-|Visual|Type|Source|
-|-|-|-|
-|Overall Quality Score|KPI Card|`dbo.pipeline\_log`|
-|Validation Check Results|Table|`dbo.pipeline\_log` + Python output|
-|Null Count by Column|Bar Chart|`dbo.pipeline\_log`|
-|Data Completeness %|Horizontal Bar|`dbo.pipeline\_log`|
-|Quality Score Trend (30d)|Line Chart|`dbo.pipeline\_log`|
-|Staging Log Extract|Table|`dbo.pipeline\_log` — stage = 'Staging'|
+| Visual                    | Type           | Source                                  |
+| ------------------------- | -------------- | --------------------------------------- |
+| Overall Quality Score     | KPI Card       | `dbo.pipeline\_log`                     |
+| Validation Check Results  | Table          | `dbo.pipeline\_log` + Python output     |
+| Null Count by Column      | Bar Chart      | `dbo.pipeline\_log`                     |
+| Data Completeness %       | Horizontal Bar | `dbo.pipeline\_log`                     |
+| Quality Score Trend (30d) | Line Chart     | `dbo.pipeline\_log`                     |
+| Staging Log Extract       | Table          | `dbo.pipeline\_log` - stage = 'Staging' |
 
 ### Data Model Relationships (Power BI)
 
