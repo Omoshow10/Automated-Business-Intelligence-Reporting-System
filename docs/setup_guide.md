@@ -16,7 +16,7 @@ Complete step-by-step instructions to get the pipeline running from scratch.
 
 ---
 
-## Step 1 — Clone the Repository
+## Step 1 - Clone the Repository
 
 ```bash
 git clone https://github.com/yourusername/bi-reporting-system.git
@@ -25,7 +25,7 @@ cd bi-reporting-system
 
 ---
 
-## Step 2 — Create a Virtual Environment
+## Step 2 - Create a Virtual Environment
 
 ```bash
 # Windows
@@ -39,7 +39,7 @@ source .venv/bin/activate
 
 ---
 
-## Step 3 — Install Dependencies
+## Step 3 - Install Dependencies
 
 ```bash
 pip install -r requirements.txt
@@ -52,7 +52,7 @@ python -c "import pandas, numpy, scipy, openpyxl, yaml; print('✅ All packages 
 
 ---
 
-## Step 4 — Generate the Dataset
+## Step 4 - Generate the Dataset
 
 The synthetic dataset is not included in the repository (it's generated locally):
 
@@ -75,7 +75,7 @@ Date range:    2022-01-01 → 2024-12-31
 
 ---
 
-## Step 5 — Run the Full Pipeline
+## Step 5 - Run the Full Pipeline
 
 ```bash
 python run_pipeline.py
@@ -113,20 +113,20 @@ PIPELINE EXECUTION SUMMARY
 
 ---
 
-## Step 6 — Open the Excel Report
+## Step 6 - Open the Excel Report
 
 Navigate to `data/processed/` and open `report_summary_*.xlsx`.
 
 Tabs included:
-- **Executive Summary** — yearly KPIs
-- **Monthly Trends** — MoM and YoY growth
-- **Regional Performance** — by region and year
-- **Product Analysis** — category and product breakdown
-- **Anomaly Report** — flagged transactions
+- **Executive Summary** - yearly KPIs
+- **Monthly Trends** - MoM and YoY growth
+- **Regional Performance** - by region and year
+- **Product Analysis** - category and product breakdown
+- **Anomaly Report** - flagged transactions
 
 ---
 
-## Step 7 — Open the Power BI Dashboard
+## Step 7 - Open the Power BI Dashboard
 
 1. Open Power BI Desktop
 2. **File → Open → Browse** to `dashboards/powerbi/BI_Reporting_System.pbix`
@@ -139,7 +139,7 @@ Tabs included:
 
 ---
 
-## Step 8 — Run Tests
+## Step 8 - Run Tests
 
 ```bash
 pytest tests/ -v
