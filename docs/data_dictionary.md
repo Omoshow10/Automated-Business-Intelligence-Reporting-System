@@ -93,9 +93,9 @@ Transactions flagged as statistical outliers.
 Adds MoM and YoY growth percentages to monthly revenue data. Used on Power BI Page 1.
 
 Key added columns:
-- `mom_growth_pct` — month-over-month revenue growth %
-- `yoy_growth_pct` — year-over-year revenue growth %
-- `ytd_revenue` — running YTD total, resets each January
+- `mom_growth_pct` - month-over-month revenue growth %
+- `yoy_growth_pct` - year-over-year revenue growth %
+- `ytd_revenue` - running YTD total, resets each January
 
 ### `vw_regional_performance`
 Enriches regional summary with YoY comparisons, revenue share, avg transaction value, and top sales rep. Used on Power BI Page 2.
