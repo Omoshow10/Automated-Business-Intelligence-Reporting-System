@@ -7,12 +7,12 @@
 
 # ── Database — MS SQL Server ──────────────────────────────────────────────────
 database:
-  server:             your_server           # SQL Server instance name or IP
-  database:           bi_reporting_db       # Target database name
-  driver:             SQL Server            # ODBC driver — or "ODBC Driver 18 for SQL Server"
-  trusted_connection: true                  # Windows Authentication
-  # username: sa                            # Uncomment for SQL Server auth
-  # password: YOUR_PASSWORD                 # Uncomment for SQL Server auth
+  server:             .\SQLEXPRESS                              # SQL Server instance name or IP
+  database:           bi_reporting_db                           # Target database name
+  driver:             ODBC Driver 17 for SQL Server             # ODBC driver — or "ODBC Driver 17 for SQL Server"
+  trusted_connection: true                                      # Windows Authentication
+  # username: YOUR_USERNAME                                     # Uncomment for SQL Server auth
+  # password: YOUR_PASSWORD                                     # Uncomment for SQL Server auth
 
 # ── Pipeline Stage Toggles ────────────────────────────────────────────────────
 pipeline:

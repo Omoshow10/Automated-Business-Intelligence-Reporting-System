@@ -31,7 +31,7 @@ PRODUCTS = {
         ("Webcam HD",            90,  35),
     ],
     "Software": [
-        ("CRM Suite – Annual",  2400, 300),
+        ("CRM Suite - Annual",  2400, 300),
         ("Analytics Platform",  3600, 420),
         ("Security Bundle",     1800, 180),
         ("Collaboration Tools",  960, 120),
@@ -83,7 +83,7 @@ def generate_customer_id():
     return f"CUST-{random.randint(1000, 9999)}"
 
 def seasonal_multiplier(date: datetime) -> float:
-    """Q4 strong, Q1 slow — typical B2B seasonality."""
+    """Q4 strong, Q1 slow - typical B2B seasonality."""
     q = (date.month - 1) // 3 + 1
     return {1: 0.82, 2: 0.95, 3: 1.08, 4: 1.25}[q]
 
@@ -158,11 +158,11 @@ def main():
     out = "data/raw/sales_operations.csv"
     df.to_csv(out, index=False)
 
-    print(f"✅ Saved {len(df):,} rows → {out}")
+    print(f"OK Saved {len(df):,} rows - {out}")
     print(f"\nColumn summary:")
     print(df.dtypes.to_string())
-    print(f"\nRevenue range: ${df['revenue'].min():,.2f} – ${df['revenue'].max():,.2f}")
-    print(f"Date range:    {df['date'].min()} → {df['date'].max()}")
+    print(f"\nRevenue range: ${df['revenue'].min():,.2f} - ${df['revenue'].max():,.2f}")
+    print(f"Date range:    {df['date'].min()} - {df['date'].max()}")
     print(f"Regions:       {sorted(df['region'].unique())}")
     print(f"Categories:    {sorted(df['product_category'].unique())}")
 

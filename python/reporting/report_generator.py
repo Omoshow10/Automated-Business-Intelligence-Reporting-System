@@ -92,11 +92,11 @@ class ReportGenerator:
         self.db.connect()
 
         data = {
-            "monthly":   self.db.query_df("SELECT * FROM vw_revenue_trends ORDER BY txn_year, txn_month"),
-            "regional":  self.db.query_df("SELECT * FROM vw_regional_performance ORDER BY txn_year, total_revenue DESC"),
-            "product":   self.db.query_df("SELECT * FROM rpt_product_summary ORDER BY txn_year, total_revenue DESC"),
-            "anomalies": self.db.query_df("SELECT * FROM rpt_anomalies ORDER BY revenue_zscore DESC NULLS LAST"),
-            "core":      self.db.query_df("SELECT txn_year, SUM(revenue) AS rev, SUM(gross_profit) AS profit, COUNT(*) AS txns FROM core_sales GROUP BY txn_year"),
+            "monthly":   self.db.query_df("SELECT * FROM dbo.vw_revenue_trends ORDER BY txn_year, txn_month"),
+            "regional":  self.db.query_df("SELECT * FROM dbo.vw_regional_performance ORDER BY txn_year, total_revenue DESC"),
+            "product":   self.db.query_df("SELECT * FROM dbo.rpt_product_summary ORDER BY txn_year, total_revenue DESC"),
+            "anomalies": self.db.query_df("SELECT * FROM dbo.rpt_anomalies ORDER BY revenue_zscore DESC"),
+            "core":      self.db.query_df("SELECT txn_year, SUM(revenue) AS rev, SUM(gross_profit) AS profit, COUNT(*) AS txns FROM dbo.core_sales GROUP BY txn_year"),
         }
 
         self.db.disconnect()
